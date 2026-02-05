@@ -1,0 +1,54 @@
+---
+config:
+  layout: fixed
+---
+flowchart TB
+    A["Open App"] --> B{"User already logged in"}
+    B -- Yes --> S["Swipe Screen"]
+    B -- No --> L["Login or Signup"]
+    L --> LOK{"Auth success"}
+    LOK -- No --> LERR["Show error and retry"]
+    LERR --> L
+    LOK -- Yes --> PREFNOW{"Set preferences now"}
+    PREFNOW -- Yes --> P1["Preferences Page\nDiet or Cuisine or Price or Rating or Spice"]
+    P1 --> PSAVE{"Save"}
+    PSAVE -- Save --> LOCQ{"Location permission granted"}
+    PSAVE -- Cancel --> LOCQ
+    PREFNOW -- Skip --> LOCQ
+    LOCQ -- Yes --> FEEDREQ["Request Feed\nLocation plus Radius plus Preferences"]
+    LOCQ -- No --> MAN["Manual location or limited mode"]
+    MAN --> FEEDREQ
+    FEEDREQ --> HCHK{"Has enough like history"}
+    HCHK -- Yes --> ANALYZE["Analyze like history\nDerive signals"]
+    HCHK -- No --> FALLBACK["Fallback\nUse preferences based discovery"]
+    ANALYZE --> BUILD["Build recommended feed\nMatch cuisine and price and rating"]
+    FALLBACK --> BUILD
+    BUILD --> DEDUP["Avoid repeats\nExclude previously seen items\nApply time window"]
+    DEDUP --> FILTER["Apply distance filter\nWithin radius"]
+    FILTER --> F["Return feed items"]
+    F --> RES{"Items returned"}
+    RES -- No items --> EMPTY["Empty state\nExpand radius or relax preferences"]
+    EMPTY --> FEEDREQ
+    RES -- Network or API error --> ERR["Error state\nRetry or offline fallback"]
+    ERR --> FEEDREQ
+    RES -- Items found --> S
+    S -- Open Likes --> LK["Likes List"]
+    S -- Open Preferences --> P2["Preferences Page\nView or change"]
+    S -- Tap Card --> D["Food Detail"]
+    S -- Swipe Right --> LIKEACT["Save to Likes\nRecord swipe history"]
+    S L_S_DISLIKEACT_0@-- Swipe Left --> DISLIKEACT["Mark Disliked\nRecord swipe history"]
+    LK -- Remove Like --> RM["Remove from Likes"]
+    RM --> LK
+    LK -- Back --> S
+    P2 -- Save --> REF["Refresh feed\nUpdate recommendation queue"]
+    REF --> FEEDREQ
+    P2 -- Back --> S
+    D -- Like --> LIKEACT
+    D -- Dislike --> DISLIKEACT
+    D -- Back --> S
+    LIKEACT --> N["Next Card"]
+    N --> S & S
+    DISLIKEACT --> N
+
+
+    L_S_DISLIKEACT_0@{ curve: natural }
