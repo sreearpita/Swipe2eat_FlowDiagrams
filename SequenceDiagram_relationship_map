@@ -1,0 +1,42 @@
+flowchart TB
+
+  A[Diagram 1<br/>Auth and Preferences] --> B[Diagram 2<br/>Feed Generation]
+  B --> C[Diagram 3<br/>Swipe and Likes History]
+  C --> D[Diagram 4<br/>Details Order and Navigation]
+
+  subgraph Diagram_1[Diagram 1: Auth and Preferences]
+    A1[Signup or Login]
+    A2[JWT stored in app]
+    A3[First login: Save dietary preferences]
+    A4[Ready to discover]
+    A1 --> A2 --> A3 --> A4
+  end
+
+  subgraph Diagram_2[Diagram 2: Feed Generation]
+    B1[App gets location]
+    B2[Request feed]
+    B3[Reco service checks history]
+    B4[If enough history: personalized feed]
+    B5[Else: preference based feed]
+    B6[Return feed batch]
+    B1 --> B2 --> B3 --> B4 --> B6
+    B3 --> B5 --> B6
+  end
+
+  subgraph Diagram_3[Diagram 3: Swipe and Likes History]
+    C1[User swipes]
+    C2[Record swipe history]
+    C3[If like: save like record]
+    C4[Update signals for future feed]
+    C1 --> C2 --> C3 --> C4
+  end
+
+  subgraph Diagram_4[Diagram 4: Details Order and Navigation]
+    D1[Tap card: view details]
+    D2[Load images from S3]
+    D3[Order via external app]
+    D4[Navigate via maps]
+    D1 --> D2
+    D1 --> D3
+    D1 --> D4
+  end
