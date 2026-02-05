@@ -1,0 +1,62 @@
+flowchart TB
+
+%% =========================
+%% TRIGGERS
+%% =========================
+T1[Scheduled Job Trigger\nCRON or EventBridge] --> PIPE
+T2[Manual Trigger by Admin\nRun refresh now] --> PIPE
+
+%% =========================
+%% PIPELINE START
+%% =========================
+PIPE[Start Data Refresh Pipeline] --> SRC[Load configured external sources\nAPIs datasets scrapers]
+
+%% =========================
+%% FETCH STAGE
+%% =========================
+SRC --> FETCH[Fetch restaurant and food item data\nPaginate and rate limit]
+FETCH --> FOK{Fetch success}
+
+FOK -- No --> FERR[Log fetch error\nRetry with backoff\nSkip source if still failing] --> SRC
+FOK -- Yes --> RAW[Store raw response temporarily\nIn memory or staging]
+
+%% =========================
+%% NORMALIZE STAGE
+%% =========================
+RAW --> NORM[Normalize into canonical schema\nRestaurant FoodItem Images Tags Price Rating Location]
+NORM --> VLD[Validate required fields\nName price restaurant id coordinates]
+VLD --> VOK{Validation pass}
+
+VOK -- No --> BAD[Quarantine invalid records\nMark for review\nDo not block pipeline] --> NEXTSRC
+VOK -- Yes --> DEDUP[Deduplicate by source id\nor restaurant plus item name]
+
+%% =========================
+%% UPSERT INTO DB
+%% =========================
+DEDUP --> UPS[Upsert into DB\nRestaurants then Food Items then Image Metadata]
+UPS --> DBOK{DB write success}
+
+DBOK -- No --> DBERR[Log DB error\nRetry\nMove to dead letter list if repeated] --> END
+DBOK -- Yes --> IMGQ{Has image urls}
+
+%% =========================
+%% IMAGES HANDLING
+%% =========================
+IMGQ -- No --> NEXTSRC[Next source or next page] --> SRC
+IMGQ -- Yes --> IMGSTORE[Store images\nOption A store URL only\nOption B download then upload to S3]
+IMGSTORE --> IMOK{Image step ok}
+IMOK -- No --> IMERR[Log image error\nUse placeholder image] --> NEXTSRC
+IMOK -- Yes --> NEXTSRC
+
+%% =========================
+%% END + OBSERVABILITY
+%% =========================
+NEXTSRC --> DONE{All sources processed}
+DONE -- No --> SRC
+DONE -- Yes --> END[Pipeline complete\nUpdate last refresh timestamp]
+
+END --> MET[Send metrics and logs to Datadog\nItems processed errors latency]
+BAD --> MET
+FERR --> MET
+DBERR --> MET
+IMERR --> MET
