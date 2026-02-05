@@ -1,0 +1,163 @@
+sequenceDiagram
+  autonumber
+
+  participant U as User
+  participant APP as Flutter App
+  participant EDGE as ALB or API Gateway
+  participant AUTH as Auth Service
+  participant PREF as Preference Service
+  participant RECO as Recommendation Service
+  participant FOOD as Food Data Service
+  participant RDS as RDS
+  participant S3 as S3
+  participant DD as Datadog
+
+  U->>APP: Open app
+  APP->>APP: Load local session token
+
+  alt No token
+    U->>APP: Signup or Login
+    APP->>EDGE: POST auth
+    EDGE->>AUTH: Authenticate user
+    AUTH->>RDS: Read user record
+    RDS-->>AUTH: User valid
+    AUTH-->>EDGE: Return JWT
+    EDGE-->>APP: Return JWT
+    APP->>APP: Store JWT
+  else Token exists
+    APP->>EDGE: GET profile
+    EDGE->>AUTH: Validate token
+    AUTH->>RDS: Validate session
+    RDS-->>AUTH: OK
+    AUTH-->>EDGE: OK
+    EDGE-->>APP: OK
+  end
+
+  opt First login preferences
+    U->>APP: Set dietary preferences
+    APP->>EDGE: PUT preferences
+    EDGE->>PREF: Save preferences
+    PREF->>RDS: Upsert preferences
+    RDS-->>PREF: Saved
+    PREF-->>EDGE: OK
+    EDGE-->>APP: OK
+  end
+
+  Note over APP: App gets location from device GPS
+  opt User changes location manually
+    U->>APP: Enter manual location
+    APP->>APP: Store temporary location override
+  end
+
+  APP->>EDGE: GET feed request with location and radius
+  EDGE->>RECO: Build feed
+
+  RECO->>RDS: Read preferences
+  RDS-->>RECO: Preferences
+
+  RECO->>RDS: Read swipe history and likes
+  RDS-->>RECO: Seen items
+
+  alt Sufficient like history
+    RECO->>RDS: Analyze like history signals
+    RDS-->>RECO: Like history
+    RECO->>FOOD: Request candidate items by signals and location
+  else Insufficient history
+    RECO->>FOOD: Request items by preferences and location
+  end
+
+  FOOD->>RDS: Query restaurants and food items
+  RDS-->>FOOD: Item metadata and image keys
+  FOOD-->>RECO: Items
+
+  RECO->>RECO: Filter by distance and remove duplicates
+  RECO-->>EDGE: Feed batch
+  EDGE-->>APP: Feed batch
+  APP-->>U: Show swipe cards
+
+  loop Each swipe action
+    U->>APP: Swipe right or left
+    APP->>EDGE: POST swipe action
+    EDGE->>RECO: Record swipe and update signals
+    RECO->>RDS: Insert swipe history
+    RDS-->>RECO: OK
+
+    alt Swipe right
+      RECO->>RDS: Insert like record
+      RDS-->>RECO: OK
+    end
+
+    RECO-->>EDGE: OK
+    EDGE-->>APP: OK
+    APP-->>U: Show next card
+  end
+
+  opt Tap card to view details
+    U->>APP: Tap item
+    APP->>EDGE: GET item details
+    EDGE->>FOOD: Get details
+    FOOD->>RDS: Query item and restaurant details
+    RDS-->>FOOD: Details and image keys
+    FOOD-->>EDGE: Details and image keys
+    EDGE-->>APP: Details and image keys
+    APP->>S3: Load image by key or signed URL
+    S3-->>APP: Image
+    APP-->>U: Show detail screen
+  end
+
+  opt View liked items list
+    U->>APP: Open likes list
+    APP->>EDGE: GET likes
+    EDGE->>RECO: Fetch likes list
+    RECO->>RDS: Query likes
+    RDS-->>RECO: Likes
+    RECO-->>EDGE: Likes
+    EDGE-->>APP: Likes
+    APP-->>U: Show liked items
+  end
+
+  par Observability
+    AUTH-->>DD: Logs and traces
+    PREF-->>DD: Logs and traces
+    RECO-->>DD: Logs and traces
+    FOOD-->>DD: Logs and traces
+    EDGE-->>DD: Metrics
+  end
+
+  participant SCH as Scheduler
+  participant EXT as External Food APIs
+
+  SCH->>FOOD: Trigger refresh job
+  FOOD->>EXT: Fetch raw food data
+  EXT-->>FOOD: Raw data
+  FOOD->>FOOD: Normalize data
+  FOOD->>RDS: Upsert restaurants and items
+  RDS-->>FOOD: Saved
+  FOOD-->>DD: Logs and metrics
+
+  
+  
+  
+ 
+  
+  participant MAP as Google Maps App
+  participant EXT as Grab or FoodPanda
+
+  U->>APP: View food details screen
+
+  opt Order food online
+    U->>APP: Tap Order button
+    APP->>EDGE: GET order redirect info
+    EDGE->>FOOD: Fetch restaurant ordering links
+    FOOD->>RDS: Read external order URLs
+    RDS-->>FOOD: Grab or FoodPanda URLs
+    FOOD-->>EDGE: Order URLs
+    EDGE-->>APP: Order URLs
+    APP-->>EXT: Open external ordering app
+  end
+
+  opt Navigate to restaurant
+    U->>APP: Tap Directions
+    APP->>APP: Build map intent with coordinates
+    APP-->>MAP: Open navigation with destination
+  end
