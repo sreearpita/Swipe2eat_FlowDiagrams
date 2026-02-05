@@ -1,0 +1,32 @@
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant APP as Flutter App
+  participant EDGE as ALB or API Gateway
+  participant FOOD as Food Data Service
+  participant RDS as RDS
+  participant S3 as S3
+  participant MAP as Google Maps
+  participant EXT as Grab or FoodPanda
+
+  U->>APP: Tap food card
+  APP->>EDGE: GET food details
+  EDGE->>FOOD: Fetch details
+  FOOD->>RDS: Query food and restaurant info
+  RDS-->>FOOD: Details and image keys
+  FOOD-->>EDGE: Details
+  EDGE-->>APP: Details
+
+  APP->>S3: Load image
+  S3-->>APP: Image
+  APP-->>U: Show detail screen
+
+  opt Order food
+    U->>APP: Tap Order
+    APP-->>EXT: Open external ordering app
+  end
+
+  opt Navigate to restaurant
+    U->>APP: Tap Directions
+    APP-->>MAP: Open navigation
+  end
