@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant APP as Flutter App
+  participant EDGE as ALB or API Gateway
+  participant RECO as Recommendation Service
+  participant RDS as RDS
+
+  U->>APP: Swipe card
+  APP->>EDGE: POST swipe action
+  EDGE->>RECO: Record swipe
+
+  RECO->>RDS: Insert swipe history
+  RDS-->>RECO: OK
+
+  alt Swipe right
+    RECO->>RDS: Save like record
+    RDS-->>RECO: OK
+  end
+
+  RECO-->>EDGE: Success
+  EDGE-->>APP: Success
+  APP-->>U: Show next card
