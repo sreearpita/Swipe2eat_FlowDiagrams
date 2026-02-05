@@ -1,0 +1,34 @@
+sequenceDiagram
+  autonumber
+  participant APP as Flutter App
+  participant EDGE as ALB or API Gateway
+  participant RECO as Recommendation Service
+  participant FOOD as Food Data Service
+  participant RDS as RDS
+
+  Note over APP: App gets location from device
+
+  APP->>EDGE: GET feed request (location, radius)
+  EDGE->>RECO: Build feed
+
+  RECO->>RDS: Read preferences
+  RDS-->>RECO: Preferences
+
+  RECO->>RDS: Read swipe history and likes
+  RDS-->>RECO: History
+
+  alt Sufficient like history
+    RECO->>RDS: Analyze like patterns
+    RDS-->>RECO: Signals
+    RECO->>FOOD: Fetch candidate items by signals
+  else Insufficient history
+    RECO->>FOOD: Fetch items by preferences
+  end
+
+  FOOD->>RDS: Query food and restaurant data
+  RDS-->>FOOD: Food items
+  FOOD-->>RECO: Items
+
+  RECO->>RECO: Filter by distance and remove duplicates
+  RECO-->>EDGE: Feed batch
+  EDGE-->>APP: Feed batch
