@@ -1,0 +1,61 @@
+flowchart TB
+
+%% =========================
+%% ADMIN ENTRY
+%% =========================
+A[Open Admin Panel] --> B{Admin already logged in}
+B -- No --> L[Admin Login]
+B -- Yes --> D[Admin Dashboard]
+
+L --> LOK{Login success}
+LOK -- No --> LERR[Show error and retry] --> L
+LOK -- Yes --> D
+
+%% =========================
+%% DASHBOARD ACTIONS
+%% =========================
+D -->|Manage Food Items| F[Food Management]
+D -->|Manage Restaurants| R[Restaurant Management]
+D -->|Run Data Refresh| DR[Trigger Data Refresh]
+D -->|View Logs| LOG[View System Logs]
+
+%% =========================
+%% FOOD MANAGEMENT
+%% =========================
+F -->|Add New| FA[Add Food Item]
+F -->|Edit Existing| FE[Edit Food Item]
+F -->|Deactivate| FD[Deactivate Food Item]
+
+FA --> FS{Save}
+FE --> FS
+FD --> FS
+FS -- Success --> F
+FS -- Error --> FERR[Show validation or save error] --> F
+
+%% =========================
+%% RESTAURANT MANAGEMENT
+%% =========================
+R -->|Add New| RA[Add Restaurant]
+R -->|Edit Existing| RE[Edit Restaurant]
+R -->|Deactivate| RD[Deactivate Restaurant]
+
+RA --> RS{Save}
+RE --> RS
+RD --> RS
+RS -- Success --> R
+RS -- Error --> RERR[Show error] --> R
+
+%% =========================
+%% DATA REFRESH
+%% =========================
+DR --> CONF{Confirm refresh}
+CONF -- Yes --> RUN[Run ingestion pipeline]
+CONF -- No --> D
+
+RUN --> DONE[Show refresh status] --> D
+
+%% =========================
+%% LOG VIEW
+%% =========================
+LOG -->|Filter by date or service| LOGV[View logs]
+LOGV --> D
