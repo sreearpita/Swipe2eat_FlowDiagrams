@@ -1,0 +1,69 @@
+sequenceDiagram
+  autonumber
+
+  participant A as Admin
+  participant UI as Admin UI
+  participant EDGE as ALB or API Gateway
+  participant AUTH as Auth Service
+  participant ADMIN as Admin Service
+  participant FOOD as Food Data Service
+  participant ING as Ingestion Service
+  participant RDS as RDS
+  participant DD as Datadog
+
+  %% ======================
+  %% ADMIN LOGIN
+  %% ======================
+  A->>UI: Enter credentials
+  UI->>EDGE: POST admin login
+  EDGE->>AUTH: Authenticate admin
+  AUTH->>RDS: Verify credentials and role
+  RDS-->>AUTH: Admin valid
+  AUTH-->>EDGE: JWT with admin role
+  EDGE-->>UI: JWT token
+
+  %% ======================
+  %% ADD OR UPDATE FOOD
+  %% ======================
+  A->>UI: Add or update food item
+  UI->>EDGE: POST or PUT admin food
+  EDGE->>ADMIN: Authorize admin role
+  ADMIN->>FOOD: Create or update food
+  FOOD->>RDS: Upsert food record
+  RDS-->>FOOD: OK
+  FOOD-->>ADMIN: Success
+  ADMIN-->>EDGE: Success
+  EDGE-->>UI: Success
+
+  %% ======================
+  %% DEACTIVATE FOOD
+  %% ======================
+  A->>UI: Deactivate food item
+  UI->>EDGE: PATCH deactivate food
+  EDGE->>ADMIN: Authorize admin role
+  ADMIN->>FOOD: Mark food inactive
+  FOOD->>RDS: Update active flag
+  RDS-->>FOOD: OK
+  FOOD-->>ADMIN: Success
+  ADMIN-->>EDGE: Success
+  EDGE-->>UI: Success
+
+  %% ======================
+  %% MANUAL DATA REFRESH
+  %% ======================
+  opt Trigger data refresh
+    A->>UI: Run data refresh
+    UI->>EDGE: POST refresh request
+    EDGE->>ING: Trigger ingestion pipeline
+    ING-->>UI: Accepted
+  end
+
+  %% ======================
+  %% OBSERVABILITY
+  %% ======================
+  par Monitoring
+    AUTH-->>DD: Logs and traces
+    ADMIN-->>DD: Logs and traces
+    FOOD-->>DD: Logs and traces
+    ING-->>DD: Metrics
+  end
