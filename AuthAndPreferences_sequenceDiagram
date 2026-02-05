@@ -1,0 +1,39 @@
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant APP as Flutter App
+  participant EDGE as ALB or API Gateway
+  participant AUTH as Auth Service
+  participant PREF as Preference Service
+  participant RDS as RDS
+
+  U->>APP: Open app
+  APP->>APP: Check local token
+
+  alt No token
+    U->>APP: Signup or Login
+    APP->>EDGE: POST auth request
+    EDGE->>AUTH: Authenticate user
+    AUTH->>RDS: Verify credentials
+    RDS-->>AUTH: User valid
+    AUTH-->>EDGE: JWT token
+    EDGE-->>APP: JWT token
+    APP->>APP: Store JWT
+  else Token exists
+    APP->>EDGE: Validate token
+    EDGE->>AUTH: Validate JWT
+    AUTH->>RDS: Check session
+    RDS-->>AUTH: OK
+    AUTH-->>EDGE: OK
+    EDGE-->>APP: OK
+  end
+
+  opt First login
+    U->>APP: Set dietary preferences
+    APP->>EDGE: PUT preferences
+    EDGE->>PREF: Save preferences
+    PREF->>RDS: Store preferences
+    RDS-->>PREF: Saved
+    PREF-->>EDGE: OK
+    EDGE-->>APP: OK
+  end
