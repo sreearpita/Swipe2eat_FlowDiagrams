@@ -1,0 +1,63 @@
+sequenceDiagram
+  autonumber
+
+  participant SCH as Scheduler
+  participant ADM as Admin
+  participant EDGE as ALB or API Gateway
+  participant ING as Data Ingestion Service
+  participant EXT as External Data Sources
+  participant NORM as Normalizer
+  participant RDS as RDS Database
+  participant S3 as S3 Media
+  participant DD as Datadog
+
+  alt Scheduled refresh
+    SCH->>ING: Trigger refresh job
+  else Manual refresh
+    ADM->>EDGE: POST admin refresh request
+    EDGE->>ING: Trigger refresh job
+  end
+
+  ING->>ING: Load configured sources and credentials
+
+  loop For each external source
+    ING->>EXT: Fetch restaurants and food items
+    EXT-->>ING: Raw data payload
+
+    ING->>NORM: Normalize to canonical schema
+    NORM->>NORM: Map fields and transform units
+    NORM-->>ING: Normalized records
+
+    ING->>ING: Validate required fields
+    alt Validation fails for some records
+      ING->>ING: Quarantine invalid records
+      ING-->>DD: Log invalid count and examples
+    end
+
+    ING->>ING: Deduplicate records
+    ING->>RDS: Upsert restaurants
+    RDS-->>ING: OK
+    ING->>RDS: Upsert food items
+    RDS-->>ING: OK
+    ING->>RDS: Upsert image metadata
+    RDS-->>ING: OK
+
+    opt Image handling enabled
+      ING->>EXT: Fetch image bytes or image URL
+      alt Store URL only
+        ING->>RDS: Save image URL reference
+        RDS-->>ING: OK
+      else Upload to S3
+        ING->>S3: Upload image object
+        S3-->>ING: S3 key or URL
+        ING->>RDS: Save S3 key reference
+        RDS-->>ING: OK
+      end
+    end
+
+    ING-->>DD: Metrics and logs for this source
+  end
+
+  ING->>RDS: Update last refresh timestamp
+  RDS-->>ING: OK
+  ING-->>DD: Final metrics summary
